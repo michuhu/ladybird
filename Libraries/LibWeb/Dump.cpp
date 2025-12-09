@@ -6,12 +6,15 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "AK/Format.h"
 #include <AK/LexicalPath.h>
 #include <AK/QuickSort.h>
 #include <AK/StringBuilder.h>
+#include <AK/Time.h>
 #include <AK/Utf8View.h>
 #include <LibCore/Directory.h>
 #include <LibCore/File.h>
+#include <LibCore/Forward.h>
 #include <LibCore/StandardPaths.h>
 #include <LibWeb/CSS/CSSDescriptors.h>
 #include <LibWeb/CSS/CSSFontFaceRule.h>
@@ -65,16 +68,10 @@ static void indent(StringBuilder& builder, int levels)
         builder.append("  "sv);
 }
 
-static String s_debug_dump_path;
-
-void set_debug_dump_path(StringView path)
-{
-    s_debug_dump_path = String::from_utf8(path).release_value_but_fixme_should_propagate_errors();
-}
-
 static void dump_to_file(StringBuilder& builder, StringView filename)
 {
-    ByteString dump_path = s_debug_dump_path.to_byte_string();
+    // Set dump path to OS temporary directory
+    ByteString dump_path = MUST(String::from_byte_string(Core::StandardPaths::tempfile_directory())).to_byte_string();
 
     // Expand tilde (~) if present
     if (dump_path.starts_with("~/"sv)) {
@@ -89,7 +86,11 @@ static void dump_to_file(StringBuilder& builder, StringView filename)
         return;
     }
 
-    auto full_path = LexicalPath(dump_path).append(filename).string();
+    auto now = UnixDateTime::now();
+    auto timestamp = now.to_byte_string("%Y%m%d_%H%M%S"sv);
+    auto timestamped_filename = ByteString::formatted("{}-{}", timestamp, filename);
+
+    auto full_path = LexicalPath(dump_path).append(timestamped_filename).string();
     auto file_result = Core::File::open(full_path, Core::File::OpenMode::Write);
     if (file_result.is_error()) {
         dbgln("Failed to open dump file: {}", file_result.error());
@@ -99,6 +100,7 @@ static void dump_to_file(StringBuilder& builder, StringView filename)
 
     auto byte_string = builder.to_byte_string();
     auto write_result = file->write_some(byte_string.bytes());
+    dbgln("Dumped to {}", full_path);
     if (write_result.is_error()) {
         dbgln("Failed to write to dump file: {}", write_result.error());
         return;

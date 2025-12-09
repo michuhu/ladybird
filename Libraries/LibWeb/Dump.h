@@ -43,6 +43,4 @@ void dump_layer_statement_rule(StringBuilder&, CSS::CSSLayerStatementRule const&
 void dump_selector(StringBuilder&, CSS::Selector const&, int indent_levels = 0);
 void dump_selector(CSS::Selector const&);
 
-WEB_API void set_debug_dump_path(StringView path);
-
 }
